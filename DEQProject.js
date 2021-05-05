@@ -1,5 +1,34 @@
+const prompt = require('prompt-sync')({ sigint: true });
 
 function dy(t, y) { return (t** 2 - y)/(y - 2*t)}
+console.log("Running with ODE: dy/dt = (t** 2 - y)/(y - 2*t)\n")
+
+function promptNum(header) {
+    const num = prompt(`${header}: `);
+    if (!num) {
+        console.log("Please enter a number.");
+        return promptNum(header);
+    } else if (num.match(/[^0-9\.]/) || (num.match(/\./g) || []).length > 1) {
+        console.log(`${header} must be a number. You entered: ${num}`);
+        return promptNum(header);
+    } else {
+        return parseFloat(num);
+    }
+}
+
+const ti = promptNum("Initial t");
+const yi = promptNum("Initial y");
+
+const step = promptNum("Step Size");
+const iter = promptNum("Number of Iterations");
+
+const steps = [];
+const iters = [];
+
+for (let i = 0; i < 7; i++) {
+    steps.push(step / 2 ** i);
+    iters.push(iter * 2 ** i);
+}
 
 function euler(dt, iter, ti, yi, __dy) {
     let t = ti;
@@ -37,31 +66,38 @@ function runge(dt ,iter, ti, yi, __dy) {
     return y;
 }
 
-const steps = ["1/5", "1/10", "1/20", "1/40", "1/80", "1/160", "1/320"];
-const iters = [10, 20, 40, 80, 160, 320, 640];
-
-function table(initT, initY, title){    
-    let A = {};
-    let B = {};
+function table(initT, initY) {    
+    const approximations = {};
+    const errorRatios = {};
+    
+    const approxEuler = [];
+    const approxImproved = [];
+    const approxRunge = [];
 
     steps.forEach((step, i) => {
-        A[step] = {};
-        A[step]["Euler"] = euler(eval(step), iters[i], initT, initY, dy);
-        A[step]["Improved Euler"] = improved(eval(step), iters[i], initT, initY, dy);
-        A[step]["Runge-Kutta"] = runge(eval(step), iters[i], initT, initY, dy);
+        approxEuler.push(euler(step, iters[i], initT, initY, dy));
+        approxImproved.push(improved(step, iters[i], initT, initY, dy));
+        approxRunge.push(runge(step, iters[i], initT, initY, dy));
+        
+        approximations[i+1] = {
+            "Step Size": step,
+            "Euler": approxEuler[i],
+            "Improved Euler": approxImproved[i],
+            "Runge-Kutta": approxRunge[i]
+        }
 
         if (i >= 2) {
-            B[i+1] = {};
-            B[i+1]["Euler"] = (euler(eval(steps[i-1]),iters[i-1],initT, initY,dy) - euler(eval(steps[i-2]),iters[i-2],initT, initY,dy))/(euler(eval(steps[i]),iters[i],initT, initY,dy)-euler(eval(steps[i-1]),iters[i-1],initT, initY,dy));
-            B[i+1]["Improved Euler"] = (improved(eval(steps[i-1]),iters[i-1],initT, initY,dy) - improved(eval(steps[i-2]),iters[i-2],initT, initY,dy))/(improved(eval(steps[i]),iters[i],initT, initY,dy)-improved(eval(steps[i-1]),iters[i-1],initT, initY,dy));
-            B[i+1]["Runge-Kutta"] = (runge(eval(steps[i-1]),iters[i-1],initT, initY,dy) - runge(eval(steps[i-2]),iters[i-2],initT, initY,dy))/(runge(eval(steps[i]),iters[i],initT, initY,dy)-runge(eval(steps[i-1]),iters[i-1],initT, initY,dy));
+            errorRatios[i+1] = {
+                "Euler": (approxEuler[i-1] - approxEuler[i-2]) / (approxEuler[i] - approxEuler[i-1]),
+                "Improved Euler": (approxImproved[i-1] - approxImproved[i-2])/(approxImproved[i]-approxImproved[i-1]),
+                "Runge-Kutta": (approxRunge[i-1] - approxRunge[i-2])/(approxRunge[i]-approxRunge[i-1])
+            };
         }
     })
-    console.log(`------------------------------ ${title}A ------------------------------`);
-    console.table(A);
-    console.log(`------------------------------ ${title}B ------------------------------`);
-    console.table(B);
+    console.log(`------------------------------------- Approximations -------------------------------------`);
+    console.table(approximations);
+    console.log(`------------------------------ Error Ratios ------------------------------`);
+    console.table(errorRatios);
 }
 
-table(1, 1, "1");
-table(1, 3, "2");
+table(ti, yi);
